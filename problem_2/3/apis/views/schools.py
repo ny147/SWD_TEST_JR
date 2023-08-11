@@ -295,16 +295,17 @@ class PersonnelDetailsAPIView(APIView):
 
         class_obj = Classes.objects.filter( school_id = schools_id).all()
         cs =  ClassesSerializer(class_obj,many =True)
-        print(cs.data)
-        class_order = [ x['id'] for x in cs.data]
         
-
-        Personal_obj = Personnel.objects.filter( school_class_id__in = class_order ).order_by('personnel_type','school_class','first_name','last_name').all()
+        
+        class_id = [ x['id'] for x in cs.data]
+        class_order_map = {x['id'] :x['class_order'] for x in cs.data}
+        
+        Personal_obj = Personnel.objects.filter( school_class_id__in = class_id).order_by('personnel_type','school_class','first_name','last_name').all()
         ps =  PersonnelSerializer(Personal_obj,many =True)
 
         result = []
         for num,i in enumerate(ps.data):
-            text = f"{num+1}. school:{school_title},role:{get_role(i['personnel_type'])},class: {i['school_class']} ,name:{i['first_name']} {i['last_name']}"
+            text = f"{num+1}. school:{school_title},role:{get_role(i['personnel_type'])},class: {class_order_map[i['school_class']]} ,name:{i['first_name']} {i['last_name']}"
             result.append(text)
 
         return Response(result, status=status.HTTP_200_OK)
@@ -322,7 +323,7 @@ class SchoolHierarchyAPIView(APIView):
         pattern: in `data_pattern` variable below.
 
         """
-
+        
         data_pattern = [
             {
                 "school": "Dorm Palace School",
