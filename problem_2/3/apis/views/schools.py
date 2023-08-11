@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from apis.models import SchoolStructure, Schools, Classes, Personnel, Subjects, StudentSubjectsScore
 # from django.core import serializers
-from ..serializers import StudentSubjectsScoreSerializer,SubjectSerializer,SchoolsSerializer,ClassesSerializer,PersonnelSerializer
+from ..serializers import StudentSubjectsScoreSerializer,SubjectSerializer,SchoolsSerializer,ClassesSerializer,PersonnelSerializer,SchoolstructureSerializer
 import string
 class StudentSubjectsScoreAPIView(APIView):
 
@@ -323,7 +323,7 @@ class SchoolHierarchyAPIView(APIView):
         pattern: in `data_pattern` variable below.
 
         """
-        
+
         data_pattern = [
             {
                 "school": "Dorm Palace School",
@@ -891,9 +891,12 @@ class SchoolHierarchyAPIView(APIView):
             }
         ]
 
+        Personal_obj = Personnel.objects.filter( school_class_id__in = [1,2,3,4,5]).order_by('school_class','first_name','last_name').all()
+        ps =  PersonnelSerializer(Personal_obj,many =True)
+
         your_result = []
 
-        return Response(your_result, status=status.HTTP_200_OK)
+        return Response(ps.data, status=status.HTTP_200_OK)
 
 
 class SchoolStructureAPIView(APIView):
@@ -1077,9 +1080,47 @@ class SchoolStructureAPIView(APIView):
                 ]
             }
         ]
+        SchoolStructure_obj = SchoolStructure.objects.all()
+        sst = SchoolstructureSerializer(SchoolStructure_obj ,many =True)
+        list_a = { x['id']:[x['title'],x['parent']]for x in sst.data}
+        list_b = { x['id']:x['title'] for x in sst.data}
+        
+        #  self map 
+        temp_list = []
+        for par,i in list_a.items():
+            if(list_b.get(i[1])):
+                context = {"head_title":list_b[i[1]] , "title":i[0]}
+                temp_list.append(context )
+        
+        dd ={ x['head_title']:[] for x in temp_list}
+        for i in temp_list:
+            dd[i['head_title']].append(i['title'])
 
-        your_result = []
+        # seperate มัธยม and ม.
+        high_key = {}
+        lower_key = {}
+        for index,value in dd.items():
+            if( 'ม.' not in index):
+                high_key[index] = value
+            else :
+                lower_key[index] = value
 
-        return Response(your_result, status=status.HTTP_200_OK)
+        #  convert to data format
+        result = []  
+        for index,value in high_key.items():
+            context_sub = []
+            for i in value:
+                sub = lower_key[i]
+                context_sub_lower = []
+                for z in sub:
+                    temp_context = {"title" : z}
+                    context_sub_lower.append(temp_context)
+                context_sub.append( { 'title': i , "sub":context_sub_lower})
+                
+            result.append({'title':index , "sub":context_sub})
+            
+
+
+        return Response(result, status=status.HTTP_200_OK)
 
 
