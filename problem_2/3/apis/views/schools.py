@@ -3,7 +3,8 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from apis.models import SchoolStructure, Schools, Classes, Personnel, Subjects, StudentSubjectsScore
-
+# from django.core import serializers
+from ..serializers import StudentSubjectsScoreSerializer,SubjectSerializer,SchoolsSerializer,ClassesSerializer,PersonnelSerializer
 
 class StudentSubjectsScoreAPIView(APIView):
 
@@ -62,6 +63,24 @@ class StudentSubjectsScoreAPIView(APIView):
 
         return Response(status=status.HTTP_201_CREATED)
 
+def grade_score(score):
+    if(score >= 80 and score <= 100):
+        return 'A'
+    elif(score >= 75 and score < 80):
+        return  'B+'
+    elif(score >= 70 and score < 75):
+        return  'B'
+    elif(score >= 65 and score < 70):
+        return  'C+'
+    elif(score >= 60 and score < 65):
+        return  'C'
+    elif(score >= 55 and score < 60):
+        return  'D'
+    elif( score >= 50 and score > 55):
+        return  'D'
+    elif( score < 55):
+        return 'F'
+    return ''
 
 class StudentSubjectsScoreDetailsAPIView(APIView):
 
@@ -87,7 +106,6 @@ class StudentSubjectsScoreDetailsAPIView(APIView):
         """
 
         student_id = kwargs.get("id", None)
-
         example_context_data = {
             "student":
                 {
@@ -114,7 +132,66 @@ class StudentSubjectsScoreDetailsAPIView(APIView):
             "grade_point_average": "grade point average",
         }
 
-        return Response(example_context_data, status=status.HTTP_200_OK)
+        subject_obj = Subjects.objects.all()
+        sb = SubjectSerializer(subject_obj,many = True)
+        subject_map = {subj['id']:subj['title'] for subj in sb.data} 
+
+
+        
+        schools_obj = Schools.objects.all()
+        sch = SchoolsSerializer(schools_obj,many = True)
+        schools_map = {schs['id']:schs['title'] for schs in sch.data }
+
+
+        sj_score_obj = StudentSubjectsScore.objects.select_related('student','subjects').filter( student_id = student_id  )
+        if( not sj_score_obj):
+            return Response({'msg': ' cannot find this student_score'},status=status.HTTP_404_NOT_FOUND)
+        sj_score = StudentSubjectsScoreSerializer(sj_score_obj,many = True)
+
+        
+
+
+        # student profile
+        ps_obj = Personnel.objects.filter(id=student_id)
+        ps = PersonnelSerializer(ps_obj,many=True)
+        stf = ps.data[0]
+        
+        #  get school id
+        class_obj = Classes.objects.select_related('school').filter( id = stf['school_class'] ) 
+        cs =  ClassesSerializer(class_obj,many =True)
+        school_id = cs.data[0]['school']
+
+
+        sj_list = []
+        calculate_all = {'total_credit':0,'grade_point':0}
+        grade_weight = {'A':4,'B+':3.5,'B':3,'C+':2.5,'C':2,'D+':1.5,'D':1,'F':0}
+        print(sj_score.data)
+        for i in sj_score.data:
+            context = {
+                    "subject": subject_map[i['subjects']],
+                    "credit": i['credit'],
+                    "score": i['score'],
+                    "grade": grade_score(i['score']),
+                }
+            calculate_all['total_credit'] += i['credit']
+            calculate_all['grade_point'] += grade_weight[context['grade']]*context['credit']
+            sj_list.append(context)
+
+        context_data = {
+            "student" : {
+            "id" : student_id,
+            "fullname":f"{stf['first_name']}  {stf['last_name']}",
+            "school":schools_map[school_id]
+        },
+            "subject_detail":
+            {
+             "subject_detail":sj_list,
+             "grade_point_average": round(calculate_all['grade_point']/calculate_all['total_credit'], 2),
+            }
+        }
+
+
+        return Response(context_data  ,status=status.HTTP_200_OK)
 
 
 class PersonnelDetailsAPIView(APIView):
@@ -977,3 +1054,10 @@ class SchoolStructureAPIView(APIView):
         your_result = []
 
         return Response(your_result, status=status.HTTP_200_OK)
+
+
+class Testconnect(APIView):
+    def get(self,get):
+        data = Personnel.objects.all()
+        st = serializers.serialize('python', data)
+        return Response(st, status=status.HTTP_200_OK)
