@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from apis.models import SchoolStructure, Schools, Classes, Personnel, Subjects, StudentSubjectsScore
 # from django.core import serializers
 from ..serializers import StudentSubjectsScoreSerializer,SubjectSerializer,SchoolsSerializer,ClassesSerializer,PersonnelSerializer
-
+import string
 class StudentSubjectsScoreAPIView(APIView):
 
     @staticmethod
@@ -193,7 +193,13 @@ class StudentSubjectsScoreDetailsAPIView(APIView):
 
         return Response(context_data  ,status=status.HTTP_200_OK)
 
-
+def get_role(num):
+    if(num == 0):
+        return 'Teacher'
+    if(num == 1):
+        return 'Head of the room'
+    if(num == 2):
+        return 'Student'
 class PersonnelDetailsAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -278,10 +284,30 @@ class PersonnelDetailsAPIView(APIView):
         ]
 
         school_title = kwargs.get("school_title", None)
+        school_title = string.capwords(school_title)
+        
+        schools_obj = Schools.objects.filter(title = school_title)
+        if( not schools_obj):
+            return Response({'msg':'Not found school name in database'})
+        sch = SchoolsSerializer(schools_obj,many = True)
+        schools_id = sch.data[0]['id']  
+        
 
-        your_result = []
+        class_obj = Classes.objects.filter( school_id = schools_id).all()
+        cs =  ClassesSerializer(class_obj,many =True)
+        print(cs.data)
+        class_order = [ x['id'] for x in cs.data]
+        
 
-        return Response(your_result, status=status.HTTP_400_BAD_REQUEST)
+        Personal_obj = Personnel.objects.filter( school_class_id__in = class_order ).order_by('personnel_type','school_class','first_name','last_name').all()
+        ps =  PersonnelSerializer(Personal_obj,many =True)
+
+        result = []
+        for num,i in enumerate(ps.data):
+            text = f"{num+1}. school:{school_title},role:{get_role(i['personnel_type'])},class: {i['school_class']} ,name:{i['first_name']} {i['last_name']}"
+            result.append(text)
+
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class SchoolHierarchyAPIView(APIView):
@@ -1056,8 +1082,3 @@ class SchoolStructureAPIView(APIView):
         return Response(your_result, status=status.HTTP_200_OK)
 
 
-class Testconnect(APIView):
-    def get(self,get):
-        data = Personnel.objects.all()
-        st = serializers.serialize('python', data)
-        return Response(st, status=status.HTTP_200_OK)
