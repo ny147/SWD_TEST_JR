@@ -131,18 +131,18 @@ class StudentSubjectsScoreDetailsAPIView(APIView):
 
             "grade_point_average": "grade point average",
         }
+        # get subject for mapping 
 
         subject_obj = Subjects.objects.all()
         sb = SubjectSerializer(subject_obj,many = True)
         subject_map = {subj['id']:subj['title'] for subj in sb.data} 
-
-
         
+        # get schools for mapping 
         schools_obj = Schools.objects.all()
         sch = SchoolsSerializer(schools_obj,many = True)
         schools_map = {schs['id']:schs['title'] for schs in sch.data }
 
-
+        # get sj_score
         sj_score_obj = StudentSubjectsScore.objects.select_related('student','subjects').filter( student_id = student_id  )
         if( not sj_score_obj):
             return Response({'msg': ' cannot find this student_score'},status=status.HTTP_404_NOT_FOUND)
@@ -161,7 +161,7 @@ class StudentSubjectsScoreDetailsAPIView(APIView):
         cs =  ClassesSerializer(class_obj,many =True)
         school_id = cs.data[0]['school']
 
-
+        #  convert to data format
         sj_list = []
         calculate_all = {'total_credit':0,'grade_point':0}
         grade_weight = {'A':4,'B+':3.5,'B':3,'C+':2.5,'C':2,'D+':1.5,'D':1,'F':0}
@@ -286,23 +286,26 @@ class PersonnelDetailsAPIView(APIView):
         school_title = kwargs.get("school_title", None)
         school_title = string.capwords(school_title)
         
+        # get school from db
         schools_obj = Schools.objects.filter(title = school_title)
         if( not schools_obj):
             return Response({'msg':'Not found school name in database'})
         sch = SchoolsSerializer(schools_obj,many = True)
         schools_id = sch.data[0]['id']  
         
-
+        # get class from db
         class_obj = Classes.objects.filter( school_id = schools_id).all()
         cs =  ClassesSerializer(class_obj,many =True)
         
-        
+        # create class map
         class_id = [ x['id'] for x in cs.data]
         class_order_map = {x['id'] :x['class_order'] for x in cs.data}
         
+        # retrive Personal by class_id and order data 
         Personal_obj = Personnel.objects.filter( school_class_id__in = class_id).order_by('personnel_type','school_class','first_name','last_name').all()
         ps =  PersonnelSerializer(Personal_obj,many =True)
 
+        # retrive Personal by class_id and order data 
         result = []
         for num,i in enumerate(ps.data):
             text = f"{num+1}. school:{school_title},role:{get_role(i['personnel_type'])},class: {class_order_map[i['school_class']]} ,name:{i['first_name']} {i['last_name']}"
@@ -891,12 +894,12 @@ class SchoolHierarchyAPIView(APIView):
             }
         ]
 
-        Personal_obj = Personnel.objects.filter( school_class_id__in = [1,2,3,4,5]).order_by('school_class','first_name','last_name').all()
-        ps =  PersonnelSerializer(Personal_obj,many =True)
+        # Personal_obj = Personnel.objects.filter( school_class_id__in = [1,2,3,4,5]).order_by('school_class','first_name','last_name').all()
+        # ps =  PersonnelSerializer(Personal_obj,many =True)
 
         your_result = []
 
-        return Response(ps.data, status=status.HTTP_200_OK)
+        return Response(your_result, status=status.HTTP_200_OK)
 
 
 class SchoolStructureAPIView(APIView):
@@ -1091,7 +1094,7 @@ class SchoolStructureAPIView(APIView):
             if(list_b.get(i[1])):
                 context = {"head_title":list_b[i[1]] , "title":i[0]}
                 temp_list.append(context )
-        
+
         dd ={ x['head_title']:[] for x in temp_list}
         for i in temp_list:
             dd[i['head_title']].append(i['title'])
